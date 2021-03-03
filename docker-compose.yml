@@ -4,5 +4,9 @@ services:
   nfsometer-build:
     build:
       context: .
+    image: "jamesmishra/nfsometer-build"
+    environment:
+      HOST_UID: $UID
+      HOST_GID: $GID
     volumes:
       - ".:/host"

@@ -1,14 +1,22 @@
-# ===============================================================================
-# The first stage of this Docker image builds a Pyinstaller binary with Python 2.
-FROM python:2.7.18-buster AS pyinstaller_stage
+FROM ubuntu:20.04 AS base
 WORKDIR /build
 
-# Install Git so we can clone nfsometer.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+    curl \
     git \
+    build-essential \
+    patchelf \
+    python2.7 \
+    python2.7-dev \
+    python3.8 \
+    python3.8-dev \
+    python3-pip \
+    python-pip-whl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl --fail --show-error --silent --location https://bootstrap.pypa.io/2.7/get-pip.py | python2.7
 
 # Install nfsometer Python2 requirements.
 RUN pip install --no-cache-dir \
@@ -31,26 +39,10 @@ RUN pyinstaller \
     --onefile \
     nfsometer.py
 
-
-
-# ===============================================================================
-# The second stage of this Docker image uses staticx (run through Python 3)
-# to bundle the (formerly) dynamically-linked libraries.
-FROM python:3.8.8-buster AS staticx_stage
-WORKDIR /build
-COPY --from=pyinstaller_stage /build/nfsometer/dist/nfsometer /build/nfsometer-dynamic
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
-    build-essential \
-    patchelf \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN python3.8 -m pip --no-cache-dir install \
     staticx
 
-RUN staticx /build/nfsometer-dynamic /build/nfsometer
+RUN staticx /build/nfsometer/dist/nfsometer /build/nfsometer/dist/nfsometer-static
 
 # When you run this image, mount the /host directory to the host filesystem.
-ENTRYPOINT [ "cp", "/build/nfsometer", "/host" ]
+ENTRYPOINT [ "/bin/bash", "-c", "cp /build/nfsometer/dist/nfsometer-static /host/nfsometer && chown $HOST_UID:$HOST_GID /host/nfsometer" ]
